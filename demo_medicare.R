@@ -32,7 +32,7 @@ library(ggplot2) # plot_usmap
 library(randomForest)
 
 ### Set directory
-setwd("/Users/laura/Documents/Insight")
+setwd("/Users/laura/Dropbox/Insight2")
 
 ### Download the data
 # The data was downloaded in a zip file which I manually opened.
@@ -63,7 +63,7 @@ medi <- mediall[ , myvar] # if data too big, overwrite
 
 # Check that the variables are coded correctly
 str(medi)
-# npi is coded as integer and not factor but that is not a problem (props will not need it)
+# npi is coded as integer and not factor but that is not a problem (probably will not need it)
 nrow(medi) == length(unique(medi$npi)) # there is indeed one unique code per provider, good.
 # Note: there are close to 300000 zip codes (should not use that in regression)
 # Country: I think it is better to change it to a binary variable (USA vs Other)
@@ -99,13 +99,11 @@ sort(prop.miss, decreasing = TRUE)
 # There are some very high percentages of missing data in some variables.
 
 # Is the missing data clustered? 
-
 smax <- apply(datamiss, 1, sum)
 hist(smax)
 
 # This is what I would normally do to further analyse clustering,
 # but the data is too big for such analysis and representation.
-
 
 # library(gplots)
 # heatmap.2(t(datamiss2),
@@ -137,19 +135,18 @@ library(cba)
 #                   min.size = round(nrow(datapr)*0.1,0),
 #                   min.retry = 10, max.iter = 16, debug = FALSE) 
 # end_time <- Sys.time()
-# saveRDS(proxi, file ="proxi_object")
+# saveRDS(proxi, file ="saved_objects")
 # end_time - start_time # 1.8 hours!!
 
 # Ideally repeat this a second time with smaller max.radius.
 pr <- readRDS("saved_objects")
 summary(pr)
-sum(summary(pr)$pattern$Size) # =nrow(datapr) has clusterd all data
-
+sum(summary(pr)$pattern$Size) == nrow(datamiss) # Has clusterd all data
 str(summary(pr))
-summary(pr)$pattern$Length[17]
+  # summary(pr)$pattern$Length[17]
 # There are only 3 clusters with more than 10% pop.
 size.cluster <- sapply(pr$a, FUN =function(i) length(i$x))
-my.cluster <- which(size.cluster > round(nrow(datamiss)*0.1,0))
+my.cluster <- which(size.cluster > round(nrow(datamiss)*0.1,0)) # contain more than 10% data
 sum(size.cluster[my.cluster][1]) * 100 / nrow(datamiss)
 sum(size.cluster[my.cluster][2]) * 100 / nrow(datamiss)
 sum(size.cluster[my.cluster][3]) * 100 / nrow(datamiss)
@@ -161,7 +158,7 @@ sapply(var.cluster[my.cluster], length)
 # this fits with the histogram
 # hist(smax)
 
-var.cluster[c(my.cluster, 1, 36)]
+var.cluster[c(my.cluster, 1, 36)] # 1,36 next two important clusters
 names(datamiss)[c(10,12,13, 9,11,30)]
 # Meanining that if a data about race is missing it is likely that all data about race are missing.
 # Since there is so much missing data I would consider removing it from the analysis
@@ -175,13 +172,12 @@ names(medi)[!names(medi)  %in%  names(datamiss)]
 prop.miss[prop.miss <= 15]
 # I would still use zip, female and male counts.
 # Maybe the disease with less than 15%? But not sure it makes sense from an interpretation
-# point of view if you do not include all diseases.
+# point of view if you do not include all rows of diseases.
 
-# Lets subset the dataset with the variables we want to keep in analysis only complete data.
+# Lets subset the dataset with the variables we want to keep in analysis and only complete rows.
 var.keep <- c(names(medi)[!names(medi)  %in%  names(datamiss)],
               "nppes_provider_zip", "beneficiary_female_count", "beneficiary_male_count")
-# 19 varibles left including response variable (indep var)
-
+# 19 varibles left including response variable
 medi <- medi[ ,var.keep] %>% 
   na.omit()
 
@@ -192,7 +188,7 @@ medi <- medi[ ,var.keep] %>%
 
 #################################  Data 2nd check and Visualisation: explanatory variable  ########################################
 
-# Lets have a look at the distribution of some of the data (check for outliers and anomalies)
+# Lets have a look at the distribution of some of the data (check for outliers and anomalies).
 # names(medi)
 
 ### proportion of individuals vs organisation
@@ -204,12 +200,12 @@ pie(temp, main ="Proportion of Individuals vs organizations",
     cex=0.9,
     col= topo.colors(2))
 legend("topright", names(temp), cex=0.8, fill = topo.colors(2))
-# There are a lot more indiviuals than organizations
+# There are a lot more indiviuals than organizations.
 
 ### proportion of USA claims vs the world
 temp <- summary(medi$nppes_provider_country_bin)
-percent <- 100 * temp / sum(temp)
-# The percent of claims outside the US is negligible
+(percent <- 100 * temp / sum(temp))
+# The percent of claims outside the US is small.
 
 ### Provider type
 temp <- sort(summary(medi$provider_type), decreasing = TRUE)
@@ -220,7 +216,7 @@ temp2["Other"] <- sum(temp[11:length(temp)])
 percentlabels <- round(100 * temp2 / sum(temp2), 1)
 pielabels <- paste(percentlabels, "%", sep="")
 par(xpd = T, mar = c(5, 4, 4, 13))
-pie(temp2, main ="Proportion of top 10 Specilizations",
+pie(temp2, main ="Top 10 Specilizations",
     labels = pielabels,
     cex=0.9,
     radius = 1.1,
@@ -235,14 +231,14 @@ prop.table(table(medi$medicare_participation_indicator))
 # Nearly all of them do.
 
 ### Distribution of distinct number of services provided per provider
-summary(medi$number_of_hcpcs) # M
+summary(medi$number_of_hcpcs) # Max is high!
 # Are the highest numbers from organizations? 
 boxplot(split(log(medi$number_of_hcpcs), medi$nppes_entity_code),
         ylab="Log scale")
-# boxplot(split(medi$number_of_hcpcs, medi$nppes_entity_code))$stat
+  # boxplot(split(medi$number_of_hcpcs, medi$nppes_entity_code))$stat
 # doesnt look like it... many outliers
 # so there are individuals that perform over 400 different services?!
-# isn't that a lot? not sure how to explain these numbers
+# isn't that a lot? not sure how to explain these numbers...
 
 ### Distribution of total number of services provided per provider
 summary(medi$total_services)
@@ -251,7 +247,7 @@ boxplot(split(log(medi$total_services), medi$nppes_entity_code),
 # These are higher numbers than I expected... many outliers
 # Again the high numbers can be individuals.
 
-### Number of medicare beneficiaries receivng service
+### Number of medicare beneficiaries receiving service
 summary(medi$total_unique_benes)
 boxplot(log(medi$total_unique_benes),
         ylab = "Log scale")
@@ -260,14 +256,14 @@ boxplot(log(medi$total_unique_benes),
 # Do the providers with many distinct services provide more total services?
 lm.temp <- lm(log(medi$total_services) ~ log(medi$number_of_hcpcs))
 summary(lm.temp) # there is a positive correlation
-# plot(log(medi$total_services), log(medi$number_of_hcpcs))
+# plot(log(medi$total_services), log(medi$number_of_hcpcs)) # long to plot
 # abline(lm.temp$coefficients[1], lm.temp$coefficients[2], col=2) # For some reason abline doesnt work.. 
 
 
 # Do the providers with many services also have more clients?
 lm.temp <- lm(log(medi$total_services) ~ log(medi$total_unique_benes))
 summary(lm.temp) # there is a positive correlation
-plot(log(medi$total_services), log(medi$total_unique_benes))
+# plot(log(medi$total_services), log(medi$total_unique_benes)) # long to plot
 # abline(lm.temp$coefficients[1], lm.temp$coefficients[2], col=2) # For some reason abline doesnt work..
 
 # average number of service per client per provider
@@ -276,6 +272,9 @@ summary(medi$av_service)
 # Usually clinitians bill 3 services (median) per client in 2016.
 # I think there might be an issue with the very high values (ask a doctor?)
 boxplot(log(medi$av_service))
+
+# There are many outliers in some variables but I do not have sufficiant knowledge to make a
+# decision on that. I will keep them.
 
 #################################  Data 2nd check and Visualisation: response variable  ########################################
 
@@ -347,7 +346,7 @@ medi.state.red <- medi.state %>%
 # lets add our values to the data statepop.
 # just checking the states are sorted identically in both dataframes
 isTRUE(medi.state.red$nppes_provider_state == statepop$abbr) # no we have some miss match
-medi.state.red[match(statepop$abbr, medi.state.red$nppes_provider_state), ] # rearrange
+medi.state.red <- medi.state.red[match(statepop$abbr, medi.state.red$nppes_provider_state), ] # rearrange
 statepop$avg <- medi.state.red$avg
 statepop$max <- medi.state.red$max
 
@@ -380,11 +379,12 @@ var.keep <- c("nppes_entity_code",
               "excess.stand")
 medi.pred <- medi %>%
   .[var.keep]
-# 1 response variable and 12 explanatory variables.
+dim(medi.pred)
+# 1 response variable and 11 explanatory variables.
 # How many parameters?
 str(medi.pred)
 # 5 factors with total of 158-5 = 153 levels
-# 7 countinuous variables
+# 7 countinuous variables (6 without male_counts)
 # 1 intercept
 # total : 161 parameters, 71 if take provider type out. 11 if also take country out.
 
@@ -439,11 +439,11 @@ lin.mod.11.log <- lm(excess.stand ~ .,
 summary(lin.mod.11.log)
 # better distribution of residuals.
 # but provider is now negatively influencing the response.
-plot(x = fitted(lin.mod.11.log),
-     y = resid(lin.mod.11.log),
-     main = "Turkey Anscombe Plot")
-abline( h=0,
-        col = "red")
+# plot(x = fitted(lin.mod.11.log),
+#      y = resid(lin.mod.11.log),
+#      main = "Turkey Anscombe Plot")
+# abline( h=0,
+#         col = "red")
 # This also looks better (1min for plot)
 # Fit other 2 models
 lin.mod.161.log <- lm(excess.stand ~ .,
@@ -461,7 +461,6 @@ summary(lin.mod.161.log)
 # some types are significant.
 
 ## Predict Validation set
-
 lin.mod.11.log.pred <- predict(lin.mod.11.log,
                                newdata = valid.set.log,
                                type = "response")
@@ -497,7 +496,7 @@ excess.std.dummy <- mean(train.set.log$excess.stand)
 (rmse.lm.161 <- RMSE(lin.mod.161.log.pred, valid.set.log$excess.stand))
 
 # all models do better than dummy
-# The first two models are very similar (state doesnt help)
+# The first two models are very similar (state doesnt help much)
 # but the last one, most complex is superior in terms of MAE and RMSE
 # Globally the error is very small!
 
@@ -510,10 +509,10 @@ excess.std.dummy <- mean(train.set.log$excess.stand)
 library(randomForest)
 
 # Need to clear some memory
-rm(list=setdiff(ls(), c("train.set.log", "valid.set.log", "medi.pred",
-                        "mae.dummy", "mae.lm.11", "mae.lm.71",
-                        "mae.lm.161", "rmse.dummy",
-                        "rmse.lm.11", "rmse.lm.71", "rmse.lm.161")))
+# rm(list=setdiff(ls(), c("train.set.log", "valid.set.log", "medi.pred",
+#                         "mae.dummy", "mae.lm.11", "mae.lm.71",
+#                         "mae.lm.161", "rmse.dummy",
+#                         "rmse.lm.11", "rmse.lm.71", "rmse.lm.161")))
 gc() # garbage collector (frees up RAM)
 
 # start_time <- Sys.time()
@@ -533,44 +532,47 @@ train.set.log.small <- train.set.log[train.small,]
 # end_time <- Sys.time()
 # # Still too long
 
-library(ranger)
+# library(ranger)
+# system.time(
+#   rf1v<- ranger(
+#     formula = excess.stand ~ ., 
+#     data = subset(train.set.log.small, select=-c(provider_type, nppes_provider_state)),
+#     num.trees = 300,
+#     mtry      = 3, # we have 10 variables.recommended :a third
+#     importance = 'impurity'
+#   )
+# ) # 304sec
+# # try on a smaller dataset.
+# # try to install bigrf? (removed from CRAN)
+# 
+# system.time(
+#   rf2<- ranger(
+#     formula = excess.stand ~ ., 
+#     data = subset(train.set.log.small, select=-c(provider_type, nppes_provider_state)),
+#     num.trees = 500,
+#     mtry      = 3, # we have 10 variables.recommended :a third
+#     importance = 'impurity'
+#   )
+# )# 506 sec
+# 
+# system.time(
+#   rf3<- ranger(
+#     formula = excess.stand ~ ., 
+#     data = subset(train.set.log, select=-c(provider_type, nppes_provider_state)),
+#     num.trees = 500,
+#     mtry      = 3, # we have 10 variables.recommended :a third
+#     importance = 'impurity'
+#   )
+# ) #4100 sec
+# saveRDS(rf1v, file ="rf1")
+# saveRDS(rf2, file ="rf2")
+# saveRDS(rf3, file ="rf3")
 
-system.time(
-  rf1v<- ranger(
-    formula = excess.stand ~ ., 
-    data = subset(train.set.log.small, select=-c(provider_type, nppes_provider_state)),
-    num.trees = 300,
-    mtry      = 3, # we have 10 variables.recommended :a third
-    importance = 'impurity'
-  )
-) # 304sec
-# try on a smaller dataset.
-# try to install bigrf? (removed from CRAN)
+rf1 <- readRDS("rf1")
+rf2 <- readRDS("rf2")
+rf3 <- readRDS("rf3")
 
-system.time(
-  rf2<- ranger(
-    formula = excess.stand ~ ., 
-    data = subset(train.set.log.small, select=-c(provider_type, nppes_provider_state)),
-    num.trees = 500,
-    mtry      = 3, # we have 10 variables.recommended :a third
-    importance = 'impurity'
-  )
-)# 506 sec
-
-system.time(
-  rf3<- ranger(
-    formula = excess.stand ~ ., 
-    data = subset(train.set.log, select=-c(provider_type, nppes_provider_state)),
-    num.trees = 500,
-    mtry      = 3, # we have 10 variables.recommended :a third
-    importance = 'impurity'
-  )
-) #4100 sec
-saveRDS(rf1v, file ="rf1")
-saveRDS(rf2, file ="rf2")
-saveRDS(rf3, file ="rf3")
-
-rf1.pred <- predict(rf1v,
+rf1.pred <- predict(rf1,
                     valid.set.log,
                     type = "response")
 
@@ -595,6 +597,21 @@ excess.std.dummy <- mean(train.set.log$excess.stand)
 
 # Interesting!!
 
+rmse.res <- c(rmse.dummy,
+              rmse.lm.11, rmse.lm.71, rmse.lm.161,
+              rmse.rf1, rmse.rf2, rmse.rf3)
+mae.res <- c(mae.dummy,
+              mae.lm.11, mae.lm.71, mae.lm.161,
+              mae.rf1, mae.rf2, mae.rf3)
+results <- cbind(mae.res, rmse.res)
+row.names(results) <- c("Dummy",
+                        "lm.11", "lm.71", "lm.161",
+                        "rand.forest1", "rand.forest2", "rand.forest3")
+print(results)
+
+# TO DO: - fine tuning random forest,
+#        - look at important variables
+#        - check OOB?
 #################################  Ideas and Questions  ########################################
 
 # Maybe should have used median excess charges when aggregating
@@ -608,6 +625,7 @@ excess.std.dummy <- mean(train.set.log$excess.stand)
     # would make things faster and prabably not loose to much info.
   # Replace NA rather than omiting incomplete data: does it improve predictions?
   # We could replace the missing data (mean, median, or regression/tree to predict missing)
+  # Ideally repeat proximus this a second time with smaller max.radius.
 
 # Perform cross-validation (K fold, k=5)
 # Try other methods (splines? MARS ?PCA? KNN, lasso for type)
